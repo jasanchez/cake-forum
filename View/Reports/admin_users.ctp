@@ -1,11 +1,11 @@
-<?php 
+<?php
 
-$this->Html->addCrumb(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Reported'), array('controller' => 'reports', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'reports', 'action' => 'users')); ?>
+$this->Breadcrumb->add(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
+$this->Breadcrumb->add(__d('forum', 'Reported'), array('controller' => 'reports', 'action' => 'index'));
+$this->Breadcrumb->add(__d('forum', 'Users'), array('controller' => 'reports', 'action' => 'users')); ?>
 
 <div class="controls float-right">
-	<?php 
+	<?php
 	echo $this->Html->link(__d('forum', 'Topics'), array('controller' => 'reports', 'action' => 'topics'), array('class' => 'button'));
 	echo $this->Html->link(__d('forum', 'Posts'), array('controller' => 'reports', 'action' => 'posts'), array('class' => 'button'));
 	echo $this->Html->link(__d('forum', 'Users'), array('controller' => 'reports', 'action' => 'users'), array('class' => 'button')); ?>
@@ -33,28 +33,28 @@ $this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'reports', 'a
 			</thead>
 			<tbody>
 
-			<?php if (!empty($reports)) {
+			<?php if ($reports) {
 				foreach ($reports as $counter => $report) { ?>
 
 				<tr<?php if ($counter % 2) echo ' class="altRow"'; ?>>
-					<td class="icon"><input type="checkbox" name="data[Report][items][]" value="<?php echo $report['Report']['id']; ?>:<?php echo $report['User']['id']; ?>" /></td>
+					<td class="icon"><input type="checkbox" name="data[Report][items][]" value="<?php echo $report['Report']['id']; ?>:<?php echo $report['User']['id']; ?>"></td>
 					<td>
 						<?php if (!empty($report['User']['id'])) {
-							echo $this->Html->link($report['User'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'edit', $report['User']['Profile']['id'], 'admin' => true));
+							echo $this->Html->link($report['User'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'edit', $report['User']['ForumProfile']['id'], 'admin' => true));
 						} else {
-							echo '<em class="gray">('. __d('forum', 'Deleted') .')</em>';
+							echo '<em class="gray">(' . __d('forum', 'Deleted') . ')</em>';
 						} ?>
 					</td>
-					<td><?php echo $this->Html->link($report['Reporter'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'edit', $report['Reporter']['Profile']['id'], 'admin' => true)); ?></td>
-					<td><?php echo $report['Report']['comment']; ?></td>
-					<td><?php echo $this->Time->nice($report['Report']['created'], $this->Common->timezone()); ?></td>
+					<td><?php echo $this->Html->link($report['Reporter'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'edit', $report['Reporter']['ForumProfile']['id'], 'admin' => true)); ?></td>
+					<td><?php echo h($report['Report']['comment']); ?></td>
+					<td><?php echo $this->Time->nice($report['Report']['created'], $this->Forum->timezone()); ?></td>
 				</tr>
-				
+
 				<?php }
 			} else { ?>
 
 				<tr>
-					<td colspan="5" class="empty"><?php echo __d('forum', 'There are no reported users.'); ?></td>
+					<td colspan="5" class="empty"><?php echo __d('forum', 'There are no reported users'); ?></td>
 				</tr>
 
 			<?php } ?>
@@ -64,19 +64,19 @@ $this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'reports', 'a
 
 		<?php echo $this->element('pagination'); ?>
 	</div>
-</div>	
+</div>
 
 <div class="moderate">
-	<?php 
+	<?php
 	echo $this->Form->input('action', array(
 		'options' => array(
 			'ban' => __d('forum', 'Ban User(s)'),
 			'remove' => __d('forum', 'Remove Report Only')
 		),
 		'div' => false,
-		'label' => __d('forum', 'Perform Action') .': '
+		'label' => __d('forum', 'Perform Action') . ': '
 	));
-	
+
 	echo $this->Form->submit(__d('forum', 'Process'), array('div' => false, 'class' => 'buttonSmall')); ?>
 </div>
 

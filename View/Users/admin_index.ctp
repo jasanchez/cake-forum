@@ -1,16 +1,14 @@
-<?php 
+<?php
 
-$this->Html->addCrumb(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index')); ?>
+$this->Breadcrumb->add(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
+$this->Breadcrumb->add(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index')); ?>
 
-<?php echo $this->Form->create('Profile', array(
-	'url' => array('controller' => 'users')
-)); ?>
+<?php echo $this->Form->create('Profile'); ?>
 
 <div class="filter">
     <?php echo __d('forum', 'Search Users'); ?>
-	<?php echo $this->Form->input('username', array('div' => false, 'label' => '('. __d('forum', 'Username') .'): ')); ?>
-	<?php echo $this->Form->input('id', array('div' => false, 'label' => '('. __d('forum', 'ID') .'): ', 'type' => 'text', 'class' => 'numeric')); ?>
+	<?php echo $this->Form->input('username', array('div' => false, 'label' => '(' . __d('forum', 'Username') . '): ')); ?>
+	<?php echo $this->Form->input('id', array('div' => false, 'label' => '(' . __d('forum', 'ID') . '): ', 'type' => 'text', 'class' => 'numeric')); ?>
 	<?php echo $this->Form->submit(__d('forum', 'Search'), array('div' => false, 'class' => 'buttonSmall')); ?>
 </div>
 
@@ -40,20 +38,20 @@ $this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'users', 'act
 			</thead>
 			<tbody>
 
-			<?php if (!empty($users)) {
+			<?php if ($users) {
 				foreach ($users as $counter => $user) { ?>
 
 				<tr<?php if ($counter % 2) echo ' class="altRow"'; ?>>
 					<td class="icon"><?php echo $user['Profile']['id']; ?></td>
 					<td><?php echo $this->Html->link($user['User'][$config['userMap']['username']], array('action' => 'edit', $user['Profile']['id'], 'admin' => true)); ?></td>
-					<td><?php echo $this->Common->options('statusMap', $user['User'][$config['userMap']['status']]); ?></td>
+					<td><?php echo $this->Forum->options('statusMap', $user['User'][$config['userMap']['status']]); ?></td>
 					<td><?php echo $user['User'][$config['userMap']['email']]; ?></td>
-					<td><?php echo $this->Time->nice($user['Profile']['created'], $this->Common->timezone()); ?></td>
+					<td><?php echo $this->Time->nice($user['Profile']['created'], $this->Forum->timezone()); ?></td>
 					<td>
 						<?php if (!empty($user['Profile']['lastLogin'])) {
-							echo $this->Time->timeAgoInWords($user['Profile']['lastLogin'], array('userOffset' => $this->Common->timezone()));
+							echo $this->Time->timeAgoInWords($user['Profile']['lastLogin'], array('userOffset' => $this->Forum->timezone()));
 						} else {
-							echo '<em class="gray">'. __d('forum', 'Never') .'</em>';
+							echo '<em class="gray">' . __d('forum', 'Never') . '</em>';
 						} ?>
 					</td>
 					<td class="stat"><?php echo number_format($user['Profile']['totalTopics']); ?></td>
@@ -77,4 +75,4 @@ $this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'users', 'act
 
 		<?php echo $this->element('pagination'); ?>
 	</div>
-</div>	
+</div>

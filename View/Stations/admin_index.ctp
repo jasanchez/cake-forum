@@ -1,7 +1,7 @@
 <?php
 
-$this->Html->addCrumb(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Forums'), array('controller' => 'stations', 'action' => 'index')); ?>
+$this->Breadcrumb->add(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
+$this->Breadcrumb->add(__d('forum', 'Forums'), array('controller' => 'stations', 'action' => 'index')); ?>
 
 <div class="controls float-right">
 	<?php echo $this->Html->link(__d('forum', 'Add Forum'), array('action' => 'add'), array('class' => 'button')); ?>
@@ -11,30 +11,28 @@ $this->Html->addCrumb(__d('forum', 'Forums'), array('controller' => 'stations', 
 	<h2><?php echo __d('forum', 'Manage Forums'); ?></h2>
 </div>
 
-<?php echo $this->Form->create('Forum', array(
-	'url' => array('controller' => 'stations')
-));
+<?php echo $this->Form->create('Forum');
 
-if (!empty($forums)) {
+if ($forums) {
 	foreach ($forums as $forum) { ?>
 
 <div class="container">
-	<div class="containerHeader">		
+	<div class="containerHeader">
 		<h3>
 			<span class="float-right">
 				<?php echo $this->Html->link(__d('forum', 'Edit'), array('action' => 'edit', $forum['Forum']['id'])); ?> -
 				<?php echo $this->Html->link(__d('forum', 'Delete'), array('action' => 'delete', $forum['Forum']['id'])); ?>
 			</span>
-			
-			<?php
-			echo $this->Form->input('Forum.'. $forum['Forum']['id'] .'.orderNo', array('value' => $forum['Forum']['orderNo'], 'div' => false, 'label' => false, 'style' => 'width: 20px', 'maxlength' => 2, 'class' => 'align-center'));
-			echo $this->Form->input('Forum.'. $forum['Forum']['id'] .'.id', array('value' => $forum['Forum']['id'], 'type' => 'hidden')); ?>
 
-			<?php echo $forum['Forum']['title']; ?> 
-			(<?php echo $this->Common->options('forumStatus', $forum['Forum']['status']); ?>)
+			<?php
+			echo $this->Form->input('Forum.' . $forum['Forum']['id'] . '.orderNo', array('value' => $forum['Forum']['orderNo'], 'div' => false, 'label' => false, 'style' => 'width: 20px', 'maxlength' => 2, 'class' => 'align-center'));
+			echo $this->Form->input('Forum.' . $forum['Forum']['id'] . '.id', array('value' => $forum['Forum']['id'], 'type' => 'hidden')); ?>
+
+			<?php echo h($forum['Forum']['title']); ?>
+			(<?php echo $this->Forum->options('forumStatus', $forum['Forum']['status']); ?>)
 		</h3>
 	</div>
-	
+
 	<div class="containerContent">
 		<table class="table">
 			<thead>
@@ -52,14 +50,14 @@ if (!empty($forums)) {
 				</tr>
 			</thead>
 			<tbody>
-    
-			<?php if (!empty($forum['Children'])) {
+
+			<?php if ($forum['Children']) {
 				foreach ($forum['Children'] as $child) {
 					echo $this->element('admin/forum_row', array(
 						'forum' => $child
 					));
 
-					if (!empty($child['SubForum'])) {
+					if ($child['SubForum']) {
 						foreach ($child['SubForum'] as $subForum) {
 							echo $this->element('admin/forum_row', array(
 								'forum' => $subForum,
@@ -67,12 +65,12 @@ if (!empty($forums)) {
 							));
 						}
 					}
-				} 
+				}
 			} else { ?>
 
 				<tr>
 					<td colspan="11" class="empty">
-						<?php echo __d('forum', 'There are no forums to display.'); ?> 
+						<?php echo __d('forum', 'There are no forums to display'); ?><br>
 						<?php echo $this->Html->link(__d('forum', 'Add Forum'), array('action' => 'add')); ?>.
 					</td>
 				</tr>

@@ -1,18 +1,24 @@
-# Forum v3.0 #
+# Forum v4.0.0-rc2 #
 
 A fully robust and powerful CakePHP forum plugin. Integrates with an external user system, support for topic and forum subscriptions, and many more features listed below.
 
-This version is only compatible with CakePHP 2.0.
+## Requirements ##
+
+* PHP 5.3.0
+* CakePHP 2
+* Composer
+* Utility Plugin - https://github.com/milesj/Utility
 
 ## Compatibility ##
 
-* v2.x - CakePHP 1.3
-* v3.x - CakePHP 2
+* v3.3 - CakePHP 2.x, PHP 5.3, Composer
+* v3.x - CakePHP 2.x, PHP 5.2
+* v2.x - CakePHP 1.3, PHP 5.2
 
-## Requirements ##
+## Contributors ##
 
-* PHP 5.2, 5.3
-* Utils Plugin - https://github.com/CakeDC/utils/tree/2.0
+* Jose Antonio Sanchez - Spanish Locale
+* Kristoffer Darj - Swedish Locale
 
 ## Documentation ##
 
@@ -21,7 +27,6 @@ Thorough documentation can be found here: http://milesj.me/code/cakephp/forum
 ## Features ##
 
 Forums
-
 * Parent and children forums
 * Activity and latest post tracking
 * Auto-lock old topics
@@ -33,7 +38,6 @@ Forums
 * Topic and forum subscription with email notifications
 
 Moderation
-
 * Moderators, Super Moderators and Admin levels
 * Restrict moderators to specific forums
 * Inline moderation and management
@@ -41,17 +45,14 @@ Moderation
 * Ability to edit and manage users content
 
 Administration
-
 * Full admin panel using CakePHP admin routes
 * Requires the administration access level
 * Can add, edit, order, delete forums
 * Manage all reported content
 * Promote, demote, create access levels, staff and moderators
-* Edit forum settings through the panel
 * Manage all aspects and content
 
 Security
-
 * Utilizes CakePHPs Auth and Security Components
 * Advanced flood protection (Posts and Topics)
 * Hourly post limitations
@@ -59,7 +60,6 @@ Security
 * Form protection against bots and hackers
 
 Miscellaneous
-
 * BBCode support using Decoda
 * Utilizes remember me features using AutoLogin
 * Mark topics as read (Session)

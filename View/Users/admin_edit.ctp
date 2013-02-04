@@ -1,8 +1,8 @@
-<?php 
+<?php
 
-$this->Html->addCrumb(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index'));
-$this->Html->addCrumb($profile['User'][$config['userMap']['username']], $this->here); ?>
+$this->Breadcrumb->add(__d('forum', 'Administration'), array('controller' => 'forum', 'action' => 'index'));
+$this->Breadcrumb->add(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index'));
+$this->Breadcrumb->add($profile['User'][$config['userMap']['username']], $this->here); ?>
 
 <div class="controls float-right">
 	<?php if ($profile['User'][$config['userMap']['status']] != $config['statusMap']['active']) {
@@ -16,9 +16,7 @@ $this->Html->addCrumb($profile['User'][$config['userMap']['username']], $this->h
 	<h2><?php echo __d('forum', 'Edit User'); ?></h2>
 </div>
 
-<?php echo $this->Form->create('Profile', array(
-	'url' => array('controller' => 'users')
-)); ?>
+<?php echo $this->Form->create('Profile'); ?>
 
 <div class="container">
 	<div class="containerContent">
@@ -34,6 +32,6 @@ $this->Html->addCrumb($profile['User'][$config['userMap']['username']], $this->h
 	</div>
 </div>
 
-<?php 
+<?php
 echo $this->Form->submit(__d('forum', 'Update'), array('class' => 'button'));
 echo $this->Form->end(); ?>
