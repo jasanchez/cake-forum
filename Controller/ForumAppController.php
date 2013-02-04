@@ -1,25 +1,18 @@
 <?php
-/** 
- * ForumAppController
- *
- * @author      Miles Johnson - http://milesj.me
- * @copyright   Copyright 2006-2011, Miles Johnson, Inc.
- * @license     http://opensource.org/licenses/mit-license.php - Licensed under The MIT License
- * @link        http://milesj.me/code/cakephp/forum
+/**
+ * @copyright	Copyright 2006-2013, Miles Johnson - http://milesj.me
+ * @license		http://opensource.org/licenses/mit-license.php - Licensed under the MIT License
+ * @link		http://milesj.me/code/cakephp/forum
  */
- 
-App::uses('ClassRegistry', 'Utility');
-App::uses('Sanitize', 'Utility');
 
-Configure::load('Forum.config');
-Configure::write('Forum.settings', ClassRegistry::init('Forum.Setting')->getSettings());
-
+/**
+ * @property ForumToolbarComponent $ForumToolbar
+ */
 class ForumAppController extends AppController {
 
 	/**
 	 * Remove parent models.
 	 *
-	 * @access public
 	 * @var array
 	 */
 	public $uses = array();
@@ -27,29 +20,108 @@ class ForumAppController extends AppController {
 	/**
 	 * Components.
 	 *
-	 * @access public
 	 * @var array
 	 */
-	public $components = array('Session', 'Security', 'Cookie', 'Auth', 'Forum.ForumToolbar', 'Forum.AutoLogin');
-	
+	public $components = array(
+		'Session', 'Security', 'Cookie', 'Acl',
+		'Auth' => array(
+			'authorize' => array('Controller')
+		),
+		'Utility.AutoLogin',
+		'Forum.ForumToolbar'
+	);
+
 	/**
 	 * Helpers.
 	 *
-	 * @access public
 	 * @var array
 	 */
-	public $helpers = array('Html', 'Session', 'Form', 'Time', 'Text', 'Forum.Common');
+	public $helpers = array(
+		'Html', 'Session', 'Form', 'Time', 'Text',
+		'Utility.Breadcrumb', 'Utility.OpenGraph', 'Utility.Decoda',
+		'Forum.Forum'
+	);
+
+	/**
+	 * Plugin configuration.
+	 *
+	 * @var array
+	 */
+	public $config = array();
+
+	/**
+	 * Database forum settings.
+	 *
+	 * @var array
+	 */
+	public $settings = array();
 
 	/**
 	 * Run auto login logic.
 	 *
-	 * @access public
 	 * @param array $user
 	 * @return void
 	 */
 	public function _autoLogin($user) {
 		ClassRegistry::init('Forum.Profile')->login($user['User']['id']);
+
 		$this->Session->delete('Forum');
+	}
+
+	/**
+	 * Validate the user has the correct ACL permissions.
+	 *
+	 * @param array $user
+	 * @return bool
+	 */
+	public function isAuthorized($user) {
+		if (isset($this->request->params['admin'])) {
+			return $this->Session->read('Forum.isAdmin');
+		}
+
+		// Admins can do everything
+		if ($this->Session->read('Forum.isAdmin')) {
+			return true;
+		}
+
+		$controller = strtolower($this->name);
+		$action = $this->request->params['action'];
+
+		// Change to polls when applicable
+		if (isset($this->request->params['pass'][1]) && $this->request->params['pass'][1] === 'poll') {
+			$controller = 'polls';
+		}
+
+		// Allow for controllers that don't have ACL
+		if (!in_array($controller, array('stations', 'topics', 'posts', 'polls'))) {
+			return true;
+		}
+
+		// Validate based on action
+		switch ($action) {
+
+			// Allow if the user belongs to admin or super
+			case 'moderate':
+				return ($this->Session->read('Forum.isSuper') || $this->Session->read('Forum.moderates'));
+			break;
+
+			// Check individual permissions
+			case 'add':
+			case 'view':
+			case 'edit':
+			case 'delete':
+				$crud = array(
+					'add' => 'create',
+					'view' => 'read',
+					'edit' => 'update',
+					'delete' => 'delete'
+				);
+
+				return $this->Session->read(sprintf('Forum.permissions.%s.%s', $controller, $crud[$action]));
+			break;
+		}
+
+		return true;
 	}
 
 	/**
@@ -57,37 +129,39 @@ class ForumAppController extends AppController {
 	 */
 	public function beforeFilter() {
 		parent::beforeFilter();
-		
-		if (isset($this->params['admin'])) {
-			$this->ForumToolbar->verifyAdmin();
-			$this->layout = 'admin';
-		}
+
+		$this->set('menuTab', '');
 
 		// Settings
 		$this->config = Configure::read('Forum');
 		$this->settings = Configure::read('Forum.settings');
-		
+		$this->layout = $this->config['viewLayout'];
+
+		// Admin
+		if (isset($this->request->params['admin'])) {
+			$this->layout = 'admin';
+		}
+
 		// Localization
-		$locale = $this->Auth->user('locale') ? $this->Auth->user('locale') : $this->settings['default_locale'];
+		$locale = $this->Auth->user('ForumProfile.locale') ?: $this->settings['defaultLocale'];
 		Configure::write('Config.language', $locale);
-		setlocale(LC_ALL, $locale .'UTF8', $locale .'UTF-8', $locale, 'eng.UTF8', 'eng.UTF-8', 'eng', 'en_US');
-		
+		setlocale(LC_ALL, $locale . 'UTF8', $locale . 'UTF-8', $locale, 'eng.UTF8', 'eng.UTF-8', 'eng', 'en_US');
+
 		// Authorization
-		$referer = $this->referer();
+		$referrer = $this->referer();
 		$routes = $this->config['routes'];
 
-		if (empty($referer) || $referer == '/forum/users/login' || $referer == '/admin/forum/users/login') {
-			$referer = array('plugin' => 'forum', 'controller' => 'forum', 'action' => 'index');
+		if (!$referrer || strpos($referrer, 'users/login') !== false) {
+			$referrer = array('plugin' => 'forum', 'controller' => 'forum', 'action' => 'index');
 		}
 
 		$this->Auth->loginAction = $routes['login'];
-		$this->Auth->loginRedirect = $referer;
-		$this->Auth->logoutRedirect = $referer;
-		$this->Auth->autoRedirect = false;
-		
+		$this->Auth->loginRedirect = $referrer;
+		$this->Auth->logoutRedirect = $referrer;
+
 		// AutoLogin
 		$this->AutoLogin->settings = array(
-			'model' => 'User',
+			'model' => FORUM_USER,
 			'username' => $this->config['userMap']['username'],
 			'password' => $this->config['userMap']['password'],
 			'plugin' => $routes['login']['plugin'],
@@ -95,9 +169,6 @@ class ForumAppController extends AppController {
 			'loginAction' => $routes['login']['action'],
 			'logoutAction' => $routes['logout']['action']
 		);
-
-		// Initialize
-		$this->ForumToolbar->initForum();
 	}
 
 	/**
@@ -105,15 +176,14 @@ class ForumAppController extends AppController {
 	 */
 	public function beforeRender() {
 		$user = $this->Auth->user();
-		
-		if (!empty($user)) {
+
+		if ($user) {
 			$user = array('User' => $user);
 		}
-		
+
 		$this->set('user', $user);
 		$this->set('config', $this->config);
 		$this->set('settings', $this->settings);
 	}
 
 }
- 

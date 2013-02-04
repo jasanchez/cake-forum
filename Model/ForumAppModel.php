@@ -1,241 +1,219 @@
 <?php
-/** 
- * ForumAppModel
- *
- * @author      Miles Johnson - http://milesj.me
- * @copyright   Copyright 2006-2011, Miles Johnson, Inc.
- * @license     http://opensource.org/licenses/mit-license.php - Licensed under The MIT License
- * @link        http://milesj.me/code/cakephp/forum
+/**
+ * @copyright	Copyright 2006-2013, Miles Johnson - http://milesj.me
+ * @license		http://opensource.org/licenses/mit-license.php - Licensed under the MIT License
+ * @link		http://milesj.me/code/cakephp/forum
  */
 
 App::uses('CakeSession', 'Model/Datasource');
 
+use Decoda\Decoda;
+
 class ForumAppModel extends AppModel {
 
 	/**
-	 * Togglable constants.
+	 * Toggleable constants.
 	 */
-	const BOOL_YES = 1;
-	const BOOL_NO = 0;
+	const YES = 1;
+	const NO = 0;
 
 	/**
 	 * Status constants.
 	 */
-	const STATUS_OPEN = 1;
-	const STATUS_CLOSED = 0;
+	const OPEN = 1;
+	const CLOSED = 0;
 
 	/**
 	 * Table prefix.
 	 *
-	 * @access public
 	 * @var string
 	 */
-	public $tablePrefix = 'forum_';
-	
+	public $tablePrefix = FORUM_PREFIX;
+
 	/**
 	 * Database config.
 	 *
-	 * @access public
 	 * @var string
 	 */
-	public $useDbConfig = 'default';
+	public $useDbConfig = FORUM_DATABASE;
 
 	/**
 	 * Cache queries.
 	 *
-	 * @access public
-	 * @var boolean
+	 * @var bool
 	 */
 	public $cacheQueries = true;
 
 	/**
-	 * Behaviors.
-	 *
-	 * @access public
-	 * @var array
-	 */
-	public $actsAs = array('Containable');
-
-	/**
 	 * No recursion.
 	 *
-	 * @access public
 	 * @var int
 	 */
 	public $recursive = -1;
 
 	/**
-	 * Allow the model to interact with the sesion.
+	 * Behaviors.
 	 *
-	 * @access public
+	 * @var array
+	 */
+	public $actsAs = array(
+		'Containable',
+		'Utility.Enumerable' => array(
+			'persist' => false,
+			'format' => false
+		),
+		'Utility.Cacheable' => array(
+			'cacheConfig' => 'forum',
+			'appendKey' => false
+		)
+	);
+
+	/**
+	 * Global enum.
+	 *
+	 * @var array
+	 */
+	public $enum = array(
+		'status' => array(
+			self::CLOSED => 'CLOSED',
+			self::OPEN => 'OPEN'
+		)
+	);
+
+	/**
+	 * Session instance.
+	 *
+	 * @var CakeSession
+	 */
+	public $Session;
+
+	/**
+	 * Allow the model to interact with the session.
+	 *
 	 * @param int $id
 	 * @param string $table
 	 * @param string $ds
-	 * @return void
 	 */
-	public function __construct($id = false, $table = null, $ds = null) {
+	public function __construct($id = null, $table = null, $ds = null) {
 		parent::__construct($id, $table, $ds);
 
 		$this->Session = new CakeSession();
-		$this->config = Configure::read('Forum');
-		$this->settings = Configure::read('Forum.settings');
-
-		if (Cache::config('forum') === false) {
-			Cache::config('forum', array(
-				'engine' 	=> 'File',
-				'serialize' => true,
-				'prefix'	=> '',
-				'path' 		=> CACHE .'forum'. DS,
-				'duration'	=> '+1 day'
-			));
-		}
-	}
-	
-	/**
-	 * Get the users highest access level.
-	 * 
-	 * @access public
-	 * @return int
-	 */
-	public function access() {
-		return $this->Session->read('Forum.access');
-	}
-	
-	/**
-	 * Return an array of access levels or IDs.
-	 * 
-	 * @access public
-	 * @param string $field
-	 * @return array
-	 */
-	public function accessLevels($field = 'id') {
-		$levels = array(0) + (array) $this->Session->read('Forum.accessLevels');
-		
-		if ($field == 'id') {
-			$levels = array_keys($levels);
-		}
-		
-		return $levels;
 	}
 
 	/**
-	 * Wrapper find() to cache sql queries.
+	 * Return all records.
 	 *
-	 * @access public
-	 * @param array $conditions
-	 * @param array $fields
-	 * @param string $order
-	 * @param string $recursive
 	 * @return array
 	 */
-	public function find($conditions = null, $fields = array(), $order = null, $recursive = null) {
-		if (!Configure::read('Cache.disable') && Configure::read('Cache.check') && !empty($fields['cache'])) {
-			if (is_array($fields['cache'])) {
-				$key = $fields['cache'][0];
-				$expires = $fields['cache'][1];
-			} else {
-				$key = $fields['cache'];
-				$expires = '+1 hour';
-			}
-			
-			Cache::config('forum', array('duration' => $expires));
-
-			$key = $this->name .'.'. $key;
-			$results = Cache::read($key, 'forum');
-
-			if (!is_array($results)) {
-				$results = parent::find($conditions, $fields, $order, $recursive);
-				
-				Cache::write($key, $results, 'forum');
-			}
-
-			return $results;
-		}
-
-		// Not caching
-		return parent::find($conditions, $fields, $order, $recursive);
+	public function getAll() {
+		return $this->find('all', array(
+			'contain' => false,
+			'cache' => $this->alias . '::' . __FUNCTION__
+		));
 	}
-	
+
 	/**
-	 * Return data based on ID.
-	 * 
-	 * @access public
+	 * Return all records as a list.
+	 *
+	 * @return array
+	 */
+	public function getList() {
+		return $this->find('list', array(
+			'contain' => false,
+			'cache' => $this->alias . '::' . __FUNCTION__
+		));
+	}
+
+	/**
+	 * Return a record based on ID.
+	 *
 	 * @param int $id
 	 * @return array
 	 */
-	public function get($id) {
+	public function getById($id) {
 		return $this->find('first', array(
 			'conditions' => array('id' => $id),
-			'contain' => false
+			'contain' => false,
+			'cache' => array($this->alias . '::' . __FUNCTION__, $id)
+		));
+	}
+
+	/**
+	 * Return a record based on slug.
+	 *
+	 * @param string $slug
+	 * @return array
+	 */
+	public function getBySlug($slug) {
+		return $this->find('first', array(
+			'conditions' => array('slug' => $slug),
+			'contain' => false,
+			'cache' => array($this->alias . '::' . __FUNCTION__, $slug)
 		));
 	}
 
 	/**
 	 * Get a count of all rows.
 	 *
-	 * @access public
 	 * @return int
 	 */
 	public function getTotal() {
 		return $this->find('count', array(
 			'contain' => false,
 			'recursive' => false,
-			'cache' => array(__FUNCTION__, '+24 hours')
+			'cache' => $this->alias . '::' . __FUNCTION__,
+			'cacheExpires' => '+24 hours'
 		));
 	}
 
 	/**
 	 * Adds locale functions to errors.
 	 *
-	 * @access public
 	 * @param string $field
 	 * @param mixed $value
 	 * @param mixed $param
-	 * @return string
+	 * @return bool
 	 */
 	public function invalidate($field, $value = true, $param = '') {
-		return parent::invalidate($field, sprintf(__d('forum', $value), $param));
+		parent::invalidate($field, sprintf(__d('forum', $value), $param));
+
+		return false;
 	}
 
 	/**
 	 * Update a row with certain fields.
-	 * 
-	 * @access public
+	 *
 	 * @param int $id
 	 * @param array $data
-	 * @return boolean
+	 * @return bool
 	 */
 	public function update($id, $data) {
 		$this->id = $id;
-		
+
 		return $this->save($data, false, array_keys($data));
 	}
-	
+
 	/**
 	 * Validate the Decoda markup.
-	 * 
-	 * @access public
+	 *
 	 * @param string $model
-	 * @return boolean
+	 * @param string $field
+	 * @return bool
 	 */
-	public function validateDecoda($model) {
-		$censored = array_map('trim', explode(',', $this->settings['censored_words']));
-		$locale = $this->config['decodaLocales'][Configure::read('Config.language')];
-
-		$decoda = new Decoda($this->data[$model]['content']);
-		$decoda->defaults()->setXhtml()->setLocale($locale);
-		$decoda->getHook('Censor')->blacklist($censored);
-
-		$parsed = $decoda->parse();
-		$errors = $decoda->getErrors();
-
-		if (empty($errors)) {
-			$this->data[$model]['contentHtml'] = $parsed;
-
+	public function validateDecoda($model, $field = 'content') {
+		if (!isset($this->data[$model][$field])) {
 			return true;
 		}
 
-		$nesting = array(); 
+		$decoda = new Decoda($this->data[$model][$field]);
+		$decoda->defaults()->parse();
+		$errors = $decoda->getErrors();
+
+		if (!$errors) {
+			return true;
+		}
+
+		$nesting = array();
 		$closing = array();
 		$scope = array();
 
@@ -247,20 +225,19 @@ class ForumAppModel extends AppModel {
 			}
 		}
 
-		if (!empty($nesting)) {
+		if ($nesting) {
 			return $this->invalidate('content', 'The following tags have been nested in the wrong order: %s', implode(', ', $nesting));
 		}
 
-		if (!empty($closing)) {
+		if ($closing) {
 			return $this->invalidate('content', 'The following tags have no closing tag: %s', implode(', ', $closing));
 		}
 
-		if (!empty($scope)) {
+		if ($scope) {
 			return $this->invalidate('content', 'The following tags can not be placed within a specific tag: %s', implode(', ', $scope));
 		}
-		
+
 		return true;
 	}
-	
+
 }
-  

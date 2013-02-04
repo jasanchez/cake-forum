@@ -1,21 +1,20 @@
-<?php 
+<?php
 
-$this->Html->addCrumb($settings['site_name'], array('controller' => 'forum', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Dashboard'), $this->here); ?>
+$this->Breadcrumb->add(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index'));
+$this->Breadcrumb->add(__d('forum', 'Dashboard'), array('action' => 'dashboard')); ?>
 
 <div class="title">
-	<?php echo $this->Html->link(__d('forum', 'Edit Profile'), array('controller' => 'users', 'action' => 'edit', 'admin' => false), array('class' => 'button float-right')); ?>	
+	<?php echo $this->Html->link(__d('forum', 'Edit Profile'), array('controller' => 'users', 'action' => 'edit', 'admin' => false), array('class' => 'button float-right')); ?>
 	<h2><?php echo __d('forum', 'Dashboard'); ?></h2>
 </div>
 
-<?php if (!empty($subscriptions)) { ?>
+<?php if ($subscriptions) { ?>
 
 <div class="container">
 	<div class="containerHeader">
 		<h3><?php echo __d('forum', 'Your Topic Subscriptions'); ?></h3>
 	</div>
-	
+
 	<div class="containerContent">
 		<table class="table">
 			<thead>
@@ -35,16 +34,16 @@ $this->Html->addCrumb(__d('forum', 'Dashboard'), $this->here); ?>
 				<tr<?php if ($counter % 2) echo ' class="altRow"'; ?>>
 					<td><?php echo $this->Html->link($topic['Topic']['title'], array('controller' => 'topics', 'action' => 'view', $topic['Topic']['slug'])); ?></td>
 					<td class="author">
-						<?php echo $this->Html->link($topic['Topic']['User'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'profile', $topic['Topic']['User']['id'])); ?>
+						<?php echo $this->Html->link($topic['Topic']['User'][$config['userMap']['username']], $this->Forum->profileUrl($topic['Topic']['User'])); ?>
 					</td>
 					<td class="stat"><?php echo number_format($topic['Topic']['post_count']); ?></td>
 					<td class="stat"><?php echo number_format($topic['Topic']['view_count']); ?></td>
-					<td class="created"><?php echo $this->Time->niceShort($topic['Subscription']['created'], $this->Common->timezone()); ?></td>
+					<td class="created"><?php echo $this->Time->niceShort($topic['Subscription']['created'], $this->Forum->timezone()); ?></td>
 					<td class="activity">
-						<?php echo $this->Time->timeAgoInWords($topic['Topic']['LastPost']['created'], array('userOffset' => $this->Common->timezone()));
-						
+						<?php echo $this->Time->timeAgoInWords($topic['Topic']['LastPost']['created'], array('userOffset' => $this->Forum->timezone()));
+
 						if (!empty($topic['Topic']['LastUser'])) { ?>
-							<span class="gray"><?php echo __d('forum', 'by'); ?> <?php echo $this->Html->link($topic['Topic']['LastUser'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'profile', $topic['Topic']['lastUser_id'])); ?></span>
+							<span class="gray"><?php echo __d('forum', 'by'); ?> <?php echo $this->Html->link($topic['Topic']['LastUser'][$config['userMap']['username']], $this->Forum->profileUrl($topic['Topic']['LastUser'])); ?></span>
 						<?php } ?>
 					</td>
 				</tr>
@@ -54,17 +53,15 @@ $this->Html->addCrumb(__d('forum', 'Dashboard'), $this->here); ?>
 			</tbody>
 		</table>
 	</div>
-</div>  
-	
-<?php } 
+</div>
 
-if (!empty($activity)) { ?>
+<?php } ?>
 
 <div class="container">
 	<div class="containerHeader">
 		<h3><?php echo __d('forum', 'Your Latest Activity'); ?></h3>
 	</div>
-	
+
 	<div class="containerContent">
 		<table class="table">
 			<thead>
@@ -79,22 +76,32 @@ if (!empty($activity)) { ?>
 			</thead>
 			<tbody>
 
-			<?php foreach ($activity as $counter => $topic) { ?>
+			<?php if ($activity) {
+				foreach ($activity as $counter => $topic) { ?>
 
 				<tr<?php if ($counter % 2) echo ' class="altRow"'; ?>>
 					<td><?php echo $this->Html->link($topic['Topic']['title'], array('controller' => 'topics', 'action' => 'view', $topic['Topic']['slug'])); ?></td>
 					<td class="author">
-						<?php echo $this->Html->link($topic['Topic']['User'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'profile', $topic['Topic']['User']['id'])); ?>
+						<?php echo $this->Html->link($topic['Topic']['User'][$config['userMap']['username']], $this->Forum->profileUrl($topic['Topic']['User'])); ?>
 					</td>
 					<td class="stat"><?php echo number_format($topic['Topic']['post_count']); ?></td>
 					<td class="stat"><?php echo number_format($topic['Topic']['view_count']); ?></td>
-					<td class="created"><?php echo $this->Time->niceShort($topic['Topic']['created'], $this->Common->timezone()); ?></td>
+					<td class="created"><?php echo $this->Time->niceShort($topic['Topic']['created'], $this->Forum->timezone()); ?></td>
 					<td class="activity">
-						<?php echo $this->Time->timeAgoInWords($topic['Topic']['LastPost']['created'], array('userOffset' => $this->Common->timezone()));
-						
+						<?php echo $this->Time->timeAgoInWords($topic['Topic']['LastPost']['created'], array('userOffset' => $this->Forum->timezone()));
+
 						if (!empty($topic['Topic']['LastUser'])) { ?>
-							<span class="gray"><?php echo __d('forum', 'by'); ?> <?php echo $this->Html->link($topic['Topic']['LastUser'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'profile', $topic['Topic']['lastUser_id'])); ?></span>
+							<span class="gray"><?php echo __d('forum', 'by'); ?> <?php echo $this->Html->link($topic['Topic']['LastUser'][$config['userMap']['username']], $this->Forum->profileUrl($topic['Topic']['LastUser'])); ?></span>
 						<?php } ?>
+					</td>
+				</tr>
+
+			<?php }
+			} else { ?>
+
+				<tr>
+					<td colspan="6" class="empty">
+						<?php echo __d('forum', 'No latest activity to display'); ?>
 					</td>
 				</tr>
 
@@ -103,17 +110,15 @@ if (!empty($activity)) { ?>
 			</tbody>
 		</table>
 	</div>
-</div>  
-	
-<?php } 
+</div>
 
-if (!empty($topics)) { ?>
-	
+<?php if ($topics) { ?>
+
 <div class="container">
 	<div class="containerHeader">
 		<h3><?php echo __d('forum', 'Your Latest Topics'); ?></h3>
 	</div>
-	
+
 	<div class="containerContent">
 		<table class="table">
 			<thead>
@@ -133,12 +138,12 @@ if (!empty($topics)) { ?>
 					<td><?php echo $this->Html->link($topic['Topic']['title'], array('controller' => 'topics', 'action' => 'view', $topic['Topic']['slug'])); ?></td>
 					<td class="stat"><?php echo number_format($topic['Topic']['post_count']); ?></td>
 					<td class="stat"><?php echo number_format($topic['Topic']['view_count']); ?></td>
-					<td class="created"><?php echo $this->Time->niceShort($topic['Topic']['created'], $this->Common->timezone()); ?></td>
+					<td class="created"><?php echo $this->Time->niceShort($topic['Topic']['created'], $this->Forum->timezone()); ?></td>
 					<td class="activity">
-						<?php echo $this->Time->timeAgoInWords($topic['LastPost']['created'], array('userOffset' => $this->Common->timezone()));
-						
+						<?php echo $this->Time->timeAgoInWords($topic['LastPost']['created'], array('userOffset' => $this->Forum->timezone()));
+
 						if (!empty($topic['LastUser'])) { ?>
-							<span class="gray"><?php echo __d('forum', 'by'); ?> <?php echo $this->Html->link($topic['LastUser'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'profile', $topic['Topic']['lastUser_id'])); ?></span>
+							<span class="gray"><?php echo __d('forum', 'by'); ?> <?php echo $this->Html->link($topic['LastUser'][$config['userMap']['username']], $this->Forum->profileUrl($topic['LastUser'])); ?></span>
 						<?php } ?>
 					</td>
 				</tr>
@@ -148,6 +153,6 @@ if (!empty($topics)) { ?>
 			</tbody>
 		</table>
 	</div>
-</div>   
-	
+</div>
+
 <?php } ?>

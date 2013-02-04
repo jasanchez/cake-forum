@@ -1,429 +1,430 @@
 <?php
-/** 
- * Forum - InstallShell
- *
- * @author      Miles Johnson - http://milesj.me
- * @copyright   Copyright 2006-2011, Miles Johnson, Inc.
- * @license     http://opensource.org/licenses/mit-license.php - Licensed under The MIT License
- * @link        http://milesj.me/code/cakephp/forum
+/**
+ * @copyright	Copyright 2006-2013, Miles Johnson - http://milesj.me
+ * @license		http://opensource.org/licenses/mit-license.php - Licensed under the MIT License
+ * @link		http://milesj.me/code/cakephp/forum
  */
 
 Configure::write('debug', 2);
 Configure::write('Cache.disable', true);
-Configure::load('Forum.config');
 
 App::uses('ConnectionManager', 'Model');
-App::uses('User', 'Model');
 App::uses('Security', 'Utility');
 App::uses('Sanitize', 'Utility');
 App::uses('Validation', 'Utility');
 
-define('FORUM_PLUGIN', dirname(dirname(dirname(__FILE__))) . '/');
-define('FORUM_SCHEMA', FORUM_PLUGIN . 'Config/Schema/');
-
 config('database');
 
 class InstallShell extends Shell {
-	
-	/**
-	 * Plugin configuration.
-	 * 
-	 * @access public
-	 * @var array
-	 */
-	public $config = array();
-	
+
 	/**
 	 * Installer configuration.
-	 * 
-	 * @access public
+	 *
 	 * @var array
 	 */
 	public $install = array(
-		'prefix' => 'forum_',
-		'database' => 'default',
+		'table' => 'users',
 		'user_id' => '',
 		'username' => '',
 		'password' => '',
-		'email' => ''
+		'email' => '',
+		'acl_admin' => 0
 	);
 
 	/**
+	 * DB Instance.
+	 *
+	 * @var DboSource
+	 */
+	public $db;
+
+	/**
 	 * Execute installer!
-	 * 
-	 * @access public
+	 *
 	 * @return void
 	 */
 	public function main() {
-		$this->config = Configure::read('Forum');
-		
 		$this->out();
-		$this->out('Plugin: Forum');
-		$this->out('Version: '. $this->config['version']);
-		$this->out('Copyright: Miles Johnson, 2010-'. date('Y'));
+		$this->out('Plugin: Forum v'. Configure::read('Forum.version'));
+		$this->out('Copyright: Miles Johnson, 2010-' . date('Y'));
 		$this->out('Help: http://milesj.me/code/cakephp/forum');
-		$this->out('Shell: Installer');
 		$this->out();
 		$this->out('This shell installs the forum plugin by creating the required database tables,');
 		$this->out('setting up the admin user, applying necessary table prefixes, and more.');
-		
+
 		$this->hr(1);
 		$this->out('Installation Steps:');
-		$this->out();
-		$this->steps(0);
-		$this->out('This installer will drop all forum specific database tables (not users) when executed!');
 
-		if (strtoupper($this->in('Continue?', array('Y', 'N'))) == 'N') {
-			return;
-		}
-
+		// Begin installation
+		$this->db = ConnectionManager::getDataSource(FORUM_DATABASE);
 		$this->steps(1);
-		$this->tablePrefix();
-		$this->hr(1);
-		
-		$this->steps(2);
-		$this->databaseConfig();
-		$this->hr(1);
-		
-		$this->steps(3);
-		$this->checkStatus();
-		$this->hr(1);
-		
-		$this->steps(4);
-		$this->createTables();
-		$this->overrideAppModel();
-		$this->hr(1);
-		
-		$this->steps(5);
-		$this->setupAdmin();
-		$this->hr(1);
-		
-		$this->steps(6);
-		$this->finalize();
-		$this->hr(1);
+
+		if ($this->usersTable()) {
+			$this->steps(2);
+
+			if ($this->checkStatus()) {
+				$this->steps(3);
+
+				if ($this->setupAcl()) {
+					$this->steps(4);
+
+					if ($this->createTables()) {
+						$this->steps(5);
+
+						if ($this->setupAdmin()) {
+							$this->steps(6);
+							$this->finalize();
+						}
+					}
+				}
+			}
+		}
 	}
-	
+
 	/**
 	 * Table of contents.
-	 * 
-	 * @access public
-	 * @param int $state 
+	 *
+	 * @param int $state
 	 * @return void
 	 */
 	public function steps($state = 0) {
+		$this->hr(1);
+
 		$steps = array(
-			'Table Prefix',
-			'Database Configuration',
+			'Users Table',
 			'Check Installation Status',
+			'Setup ACL',
 			'Create Database Tables',
-			'Create Administator',
+			'Create Administrator',
 			'Finalize Installation'
 		);
-		
+
 		foreach ($steps as $i => $step) {
 			$index = ($i + 1);
-			
-			$this->out('['. (($index < $state) ? 'x' : $index) .'] '. $step);
-		}
-		
-		$this->out();
-	}
-	
-	/**
-	 * Set the table prefix to use.
-	 * 
-	 * @access public
-	 * @return void
-	 */
-	public function tablePrefix() {
-		$prefix = $this->in('What table prefix would you like to use?');
-		
-		if (empty($prefix)) {
-			$this->out('Please provide a table prefix, I recommend "forum".');
-			$this->tablePrefix();
-			return;
-				
-		} else {
-			$prefix = trim($prefix, '_') .'_';
-			$this->out(sprintf('You have chosen the prefix: %s', $prefix));
+
+			if ($index < $state) {
+				$this->out('[x] ' . $step);
+			} else {
+				$this->out('[' . $index . '] <comment>' . $step . '</comment>');
+			}
 		}
 
-		$answer = strtoupper($this->in('Is this correct?', array('Y', 'N')));
-		
-		if ($answer == 'Y') {
-			$this->install['prefix'] = $prefix;
-		} else {
-			$this->tablePrefix();
-		}
-	}
-	
-	/**
-	 * Set the database to use.
-	 * 
-	 * @access public
-	 * @return void
-	 */
-	public function databaseConfig() {
-		$dbs = new DATABASE_CONFIG();
-		$list = array();
-		$counter = 1;
-		
-		$this->out('Possible database configurations:');
-		
-		foreach ($dbs as $db => $config) {
-			$this->out('['. $counter .'] '. $db);
-			$list[$counter] = $db;
-			$counter++;
-		}
-		
 		$this->out();
-		
-		$answer = strtoupper($this->in('Which database should the tables be created in?', array_keys($list)));
-		
-		if (isset($list[$answer])) {
-			$this->install['database'] = $list[$answer];
-			$this->db = ConnectionManager::getDataSource($this->install['database']);
-		} else {
-			$this->databaseConfig();
-		}
 	}
-	
+
+	/**
+	 * Grab the users table.
+	 *
+	 * @return bool
+	 */
+	public function usersTable() {
+		$table = $this->in('<question>What is the name of your users table?</question>');
+
+		if (!$table) {
+			$this->out('<error>Please provide a users table</error>');
+
+			return $this->usersTable();
+
+		} else {
+			$table = trim($table);
+			$this->out(sprintf('You have chosen the table: %s', $table));
+		}
+
+		$answer = strtoupper($this->in('<question>Is this correct?</question>', array('Y', 'N')));
+
+		if ($answer === 'Y') {
+			$this->install['table'] = $table;
+		} else {
+			return $this->usersTable();
+		}
+
+		return true;
+	}
+
 	/**
 	 * Check the database status before installation.
-	 * 
-	 * @access public
-	 * @return void
+	 *
+	 * @return bool
 	 */
 	public function checkStatus() {
-		// Check connection
 		if (!$this->db->isConnected()) {
-			$this->out(sprintf('Error: Database connection for %s failed!', $this->install['database']));
-			return;
-		}
-		
-		// Check the users tables
-		$tables = $this->db->listSources();
+			$this->out(sprintf('<error>Database connection for %s failed!</error>', FORUM_DATABASE));
 
-		if (!in_array('users', $tables)) {
-			$this->out(sprintf('Error: No users table was found in %s.', $this->install['database']));
-			return;
+			return false;
 		}
-		
-		$this->out('Installation status good, proceeding...');
+
+		// Check the required tables
+		$tables = $this->db->listSources();
+		$checkFor = array($this->install['table'], 'aros', 'acos', 'aros_acos');
+
+		$this->out(sprintf('The following tables are required: %s', implode(', ', $checkFor)));
+		$this->out('<info>Checking tables...</info>');
+
+		foreach ($checkFor as $table) {
+			if (!in_array($table, $tables)) {
+				$this->out(sprintf('<error>No %s table was found in %s</error>', $table, FORUM_DATABASE));
+
+				return false;
+			}
+		}
+
+		$this->out('<info>Installation status good, proceeding...</info>');
+
+		return true;
 	}
-	
+
+	/**
+	 * Create all the ACL records.
+	 */
+	public function setupAcl() {
+		$this->out('<info>Creating ACL records...</info>');
+
+		$admin = Configure::read('Forum.aroMap.admin');
+		$acl = ClassRegistry::init('Forum.Access')->installAcl();
+
+		foreach ($acl['aro'] as $id => $alias) {
+			if ($alias === $admin) {
+				$this->install['acl_admin'] = $id;
+			}
+		}
+
+		$this->out('<info>ACL setup successfully...</info>');
+
+		return true;
+	}
+
 	/**
 	 * Create the database tables based off the schemas.
-	 * 
-	 * @access public
-	 * @return void
+	 *
+	 * @return bool
 	 */
 	public function createTables() {
-		$schemas = glob(FORUM_SCHEMA . '*.sql');
+		$answer = strtoupper($this->in('<question>Existing tables will be deleted, continue?</question>', array('Y', 'N')));
+
+		if ($answer === 'N') {
+			exit();
+		}
+
+		$schemas = glob(FORUM_PLUGIN . 'Config/Schema/*.sql');
 		$executed = 0;
 		$total = count($schemas);
 		$tables = array();
-		
+
 		foreach ($schemas as $schema) {
 			$contents = file_get_contents($schema);
-			$contents = String::insert($contents, array('prefix' => $this->install['prefix']), array('before' => '{', 'after' => '}'));
+			$contents = String::insert($contents, array('prefix' => FORUM_PREFIX), array('before' => '{', 'after' => '}'));
 			$contents = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $contents);
-			
+
 			$queries = explode(';', $contents);
-			$tables[] = $this->install['prefix'] . str_replace('.sql', '', basename($schema));
-			
+			$tables[] = FORUM_PREFIX . str_replace('.sql', '', basename($schema));
+
 			foreach ($queries as $query) {
 				$query = trim($query);
 
 				if ($query !== '' && $this->db->execute($query)) {
 					$command = trim(substr($query, 0, 6));
 
-					if ($command == 'CREATE' || $command == 'ALTER') {
+					if ($command === 'CREATE' || $command === 'ALTER') {
 						$executed++;
 					}
 				}
 			}
 		}
-		
+
 		if ($executed != $total) {
-			$this->out('Error: Failed to create database tables!');
-			$this->out('Rolling back and dropping any created tables.');
-			
+			$this->out('<error>Failed to create database tables!</error>');
+			$this->out('Rolling back and dropping any created tables');
+
 			foreach ($tables as $table) {
 				$this->db->execute(sprintf('DROP TABLE `%s`;', $table));
 			}
+
+			return false;
 		} else {
-			$this->out('Tables created successfully...');
+			$this->out('<info>Tables created successfully...</info>');
 		}
+
+		return true;
 	}
-	
+
 	/**
 	 * Setup the admin user.
-	 * 
-	 * @access public
-	 * @return void
+	 *
+	 * @return bool
 	 */
 	public function setupAdmin() {
-		$answer = strtoupper($this->in('Would you like to [c]reate a new user, or use an [e]xisting user?', array('C', 'E')));
+		$answer = strtoupper($this->in('<question>Would you like to [c]reate a new user, or use an [e]xisting user?</question>', array('C', 'E')));
+		$userMap = Configure::read('Forum.userMap');
+		$statusMap = Configure::read('Forum.statusMap');
 
 		// New User
-		if ($answer == 'C') {
+		if ($answer === 'C') {
 			$this->install['username'] = $this->_newUser('username');
 			$this->install['password'] = $this->_newUser('password');
 			$this->install['email'] = $this->_newUser('email');
-			
-			$result = $this->db->execute(sprintf("INSERT INTO `users` (`%s`, `%s`, `%s`, `%s`) VALUES (%s, %s, %s, %s);",
-				$this->config['userMap']['username'], 
-				$this->config['userMap']['password'], 
-				$this->config['userMap']['email'], 
-				$this->config['userMap']['status'],
+
+			$result = $this->db->execute(sprintf("INSERT INTO `%s` (`%s`, `%s`, `%s`, `%s`) VALUES (%s, %s, %s, %s);",
+				$this->install['table'],
+				$userMap['username'],
+				$userMap['password'],
+				$userMap['email'],
+				$userMap['status'],
 				$this->db->value(Sanitize::clean($this->install['username'])),
 				$this->db->value(Security::hash($this->install['password'], null, true)),
 				$this->db->value($this->install['email']),
-				$this->db->value($this->config['statusMap']['active'])
+				$this->db->value($statusMap['active'])
 			));
 
 			if ($result) {
 				$this->install['user_id'] = $this->db->lastInsertId();
 			} else {
-				$this->out('An error has occured while creating the user.');
-				$this->setupAdmin();
+				$this->out('<error>An error has occurred while creating the user</error>');
+
+				return $this->setupAdmin();
 			}
-			
+
 		// Old User
-		} else if ($answer == 'E') {
+		} else if ($answer === 'E') {
 			$this->install['user_id'] = $this->_oldUser();
-			
+
 		// Redo
 		} else {
-			$this->setupAdmin();
+			return $this->setupAdmin();
 		}
-		
-		$result = $this->db->execute(sprintf("INSERT INTO `%saccess` (`access_level_id`, `user_id`, `created`) VALUES (4, %d, NOW());", (string) $this->install['prefix'], (int) $this->install['user_id']));
+
+		// Give ACL
+		$result = ClassRegistry::init('Forum.Access')->add(array(
+			'parent_id' => $this->install['acl_admin'],
+			'foreign_key' => $this->install['user_id']
+		));
 
 		if (!$result) {
-			$this->out('An error occured while granting administrator access.');
-			$this->setupAdmin();
+			$this->out('<error>An error occurred while granting administrator access</error>');
+
+			return $this->setupAdmin();
 		}
+
+		return true;
 	}
-	
-	/**
-	 * Rewrite specific AppModel variables.
-	 * 
-	 * @access public
-	 * @return void
-	 */
-	public function overrideAppModel() {
-		$appModel = file_get_contents(FORUM_PLUGIN . 'Model/ForumAppModel.php');
-		$appModel = preg_replace('/public \$tablePrefix = \'(.*?)\';/', 'public \$tablePrefix = \''. $this->install['prefix'] .'\';', $appModel);
-		$appModel = preg_replace('/public \$useDbConfig = \'(.*?)\';/', 'public \$useDbConfig = \''. $this->install['database'] .'\';', $appModel);
-		
-		file_put_contents(FORUM_PLUGIN . 'Model/ForumAppModel.php', $appModel);
-	}
-	
+
 	/**
 	 * Finalize the installation, woop woop.
-	 * 
-	 * @access public
+	 *
 	 * @return void
 	 */
 	public function finalize() {
 		$this->hr(1);
 		$this->out('Forum installation complete! Your admin credentials:');
 		$this->out();
-		$this->out(sprintf('Username: %s', $this->install['username']));
-		$this->out(sprintf('Email: %s', $this->install['email']));
+		$this->out(sprintf('<comment>Username:</comment> %s', $this->install['username']));
+		$this->out(sprintf('<comment>Email:</comment> %s', $this->install['email']));
 		$this->out();
-		$this->out('Please read the documentation for further configuration instructions.');
+		$this->out('Please read the documentation for further instructions:');
+		$this->out('http://milesj.me/code/cakephp/forum');
+		$this->hr(1);
 	}
-	
+
 	/**
 	 * Gather all the data for creating a new user.
-	 * 
-	 * @access protected
+	 *
 	 * @param string $mode
-	 * @return string 
+	 * @return string
 	 */
 	protected function _newUser($mode) {
+		$userMap = Configure::read('Forum.userMap');
+
 		switch ($mode) {
 			case 'username':
-				$username = trim($this->in('Username:'));
-				
-				if (empty($username)) {
+				$username = trim($this->in('<question>Username:</question>'));
+
+				if (!$username) {
 					$username = $this->_newUser($mode);
 				} else {
-					$result = $this->db->fetchRow(sprintf("SELECT COUNT(*) AS `count` FROM `users` AS `User` WHERE `%s` = %s", $this->config['userMap']['username'], $this->db->value($username)));
-					
+					$result = $this->db->fetchRow(sprintf("SELECT COUNT(*) AS `count` FROM `%s` AS `User` WHERE `%s` = %s",
+						$this->install['table'],
+						$userMap['username'],
+						$this->db->value($username)
+					));
+
 					if ($this->db->hasResult() && $result[0]['count']) {
-						$this->out('Username already exists, please try again.');
+						$this->out('<error>Username already exists, please try again</error>');
 						$username = $this->_newUser($mode);
 					}
 				}
-				
+
 				return $username;
 			break;
-			
+
 			case 'password':
-				$password = trim($this->in('Password:'));
-				
-				if (empty($password)) {
+				$password = trim($this->in('<question>Password:</question>'));
+
+				if (!$password) {
 					$password = $this->_newUser($mode);
 				}
-				
+
 				return $password;
 			break;
-			
+
 			case 'email':
-				$email = trim($this->in('Email:'));
-				
-				if (empty($email)) {
+				$email = trim($this->in('<question>Email:</question>'));
+
+				if (!$email) {
 					$email = $this->_newUser($mode);
-					
+
 				} else if (!Validation::email($email)) {
-					$this->out('Invalid email address, please try again.');
+					$this->out('<error>Invalid email address, please try again</error>');
 					$email = $this->_newUser($mode);
-					
+
 				} else {
-					$result = $this->db->fetchRow(sprintf("SELECT COUNT(*) AS `count` FROM `users` AS `User` WHERE `%s` = %s", $this->config['userMap']['email'], $this->db->value($email)));
+					$result = $this->db->fetchRow(sprintf("SELECT COUNT(*) AS `count` FROM `%s` AS `User` WHERE `%s` = %s",
+						$this->install['table'],
+						$userMap['email'],
+						$this->db->value($email)
+					));
 
 					if ($this->db->hasResult() && $result[0]['count']) {
-						$this->out('Email already exists, please try again.');
+						$this->out('<error>Email already exists, please try again</error>');
 						$email = $this->_newUser($mode);
 					}
 				}
-				
+
 				return $email;
 			break;
 		}
+
+		return null;
 	}
-	
+
 	/**
 	 * Use an old user as an admin.
-	 * 
-	 * @access protected
+	 *
 	 * @return string
 	 */
-	protected function _oldUser() {		
-		$user_id = trim($this->in('User ID:'));
-		
-		if (empty($user_id) || !is_numeric($user_id)) {
-			$user_id = $this->_oldUser();
-		
-		} else {
-			$result = $this->db->fetchRow(sprintf("SELECT * FROM `users` AS `User` WHERE `id` = %d LIMIT 1", (int) $user_id));
+	protected function _oldUser() {
+		$user_id = trim($this->in('<question>User ID:</question>'));
+		$userMap = Configure::read('Forum.userMap');
 
-			if (empty($result)) {
-				$this->out('User ID does not exist, please try again.');
+		if (!$user_id || !is_numeric($user_id)) {
+			$user_id = $this->_oldUser();
+
+		} else {
+			$result = $this->db->fetchRow(sprintf("SELECT * FROM `%s` AS `User` WHERE `id` = %d LIMIT 1",
+				$this->install['table'],
+				$user_id
+			));
+
+			if (!$result) {
+				$this->out('<error>User ID does not exist, please try again</error>');
 				$user_id = $this->_oldUser();
-				
+
 			} else {
-				$this->install['username'] = $result['User'][$this->config['userMap']['username']];
-				$this->install['password'] = $result['User'][$this->config['userMap']['password']];
-				$this->install['email'] = $result['User'][$this->config['userMap']['email']];
+				$this->install['username'] = $result['User'][$userMap['username']];
+				$this->install['password'] = $result['User'][$userMap['password']];
+				$this->install['email'] = $result['User'][$userMap['email']];
 			}
 		}
-		
+
 		return $user_id;
 	}
-	
+
 }

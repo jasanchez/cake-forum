@@ -1,40 +1,32 @@
-<?php 
-
-$this->Html->addCrumb($settings['site_name'], array('controller' => 'forum', 'action' => 'index'));
+<?php
 
 if (!empty($topic['Forum']['Parent']['slug'])) {
-	$this->Html->addCrumb($topic['Forum']['Parent']['title'], array('controller' => 'stations', 'action' => 'view', $topic['Forum']['Parent']['slug']));
+	$this->Breadcrumb->add($topic['Forum']['Parent']['title'], array('controller' => 'stations', 'action' => 'view', $topic['Forum']['Parent']['slug']));
 }
 
-$this->Html->addCrumb($topic['Forum']['title'], array('controller' => 'stations', 'action' => 'view', $topic['Forum']['slug']));
-$this->Html->addCrumb($topic['Topic']['title'], array('controller' => 'topics', 'action' => 'view', $topic['Topic']['slug'])); ?>
+$this->Breadcrumb->add($topic['Forum']['title'], array('controller' => 'stations', 'action' => 'view', $topic['Forum']['slug']));
+$this->Breadcrumb->add($topic['Topic']['title'], array('controller' => 'topics', 'action' => 'view', $topic['Topic']['slug']));
+$this->Breadcrumb->add(__d('forum', 'Post Reply'), array('action' => 'add', $topic['Topic']['slug'])); ?>
 
 <div class="title">
 	<h2><?php echo __d('forum', 'Post Reply'); ?></h2>
 </div>
 
-<?php echo $this->Form->create('Post', array(
-	'url' => array($topic['Topic']['slug'])
-)); ?>
+<?php echo $this->Form->create('Post'); ?>
 
 <div class="container">
 	<div class="containerContent">
-		<?php 
-		echo $this->Form->input('content', array(
-			'type' => 'textarea', 
-			'rows' => 15, 
-			'after' => '<span class="inputText">[b], [u], [i], [img], [url], [email], [code], [align], [list], [li], [color], [size], [quote]</span>',
-			'label' => __d('forum', 'Content')));
-		
-		echo $this->element('markitup', array('textarea' => 'PostContent')); ?>
+		<?php
+		echo $this->Form->input('content', array('type' => 'textarea', 'rows' => 15, 'label' => __d('forum', 'Content')));
+		echo $this->element('decoda', array('id' => 'PostContent')); ?>
 	</div>
 </div>
 
-<?php 
+<?php
 echo $this->Form->submit(__d('forum', 'Post Reply'), array('class' => 'button'));
 echo $this->Form->end();
 
-if (!empty($review)) { ?>
+if ($review) { ?>
 
 	<div class="container">
 		<div class="containerHeader">
@@ -48,23 +40,22 @@ if (!empty($review)) { ?>
 
 				<tr class="altRow">
 					<td colspan="2" class="align-right dark">
-						<?php echo $this->Time->niceShort($post['Post']['created'], $this->Common->timezone()); ?>
+						<?php echo $this->Time->niceShort($post['Post']['created'], $this->Forum->timezone()); ?>
 					</td>
 				</tr>
 				<tr>
 					<td valign="top" style="width: 25%">
-						<h4 class="username"><?php echo $this->Html->link($post['User'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'profile', $post['User']['id'])); ?></h4>
-						<strong><?php echo __d('forum', 'Joined'); ?>:</strong> <?php echo $this->Time->niceShort($post['User']['created'], $this->Common->timezone()); ?>
+						<h4 class="username"><?php echo $this->Html->link($post['User'][$config['userMap']['username']], $this->Forum->profileUrl($post['User'])); ?></h4>
 					</td>
 					<td valign="top">
-						<?php echo $post['Post']['contentHtml']; ?>
+						<?php echo $this->Decoda->parse($post['Post']['content']); ?>
 					</td>
 				</tr>
 
 			<?php } ?>
 
 			</table>
-		</div>      
-	</div>  
+		</div>
+	</div>
 
 <?php } ?>

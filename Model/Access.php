@@ -1,181 +1,352 @@
 <?php
-/** 
- * Forum - Access
- *
- * @author      Miles Johnson - http://milesj.me
- * @copyright   Copyright 2006-2011, Miles Johnson, Inc.
- * @license     http://opensource.org/licenses/mit-license.php - Licensed under The MIT License
- * @link        http://milesj.me/code/cakephp/forum
- */
- 
-class Access extends ForumAppModel {
-	
-	/**
-	 * Access IDs.
-	 */
-	const GUEST = 0;
-	const MEMBER = 1;
-	const MOD = 2;
-	const SUPER = 3;
-	const ADMIN = 4;
+
+App::uses('Aro', 'Model');
+
+class Access extends Aro {
 
 	/**
-	 * DB Table.
+	 * No recursion.
 	 *
-	 * @access public
+	 * @var int
+	 */
+	public $recursive = -1;
+
+	/**
+	 * Force model alias.
+	 *
 	 * @var string
 	 */
-	public $useTable = 'access';
+	public $alias = 'Access';
+
+	/**
+	 * Use AROs table.
+	 *
+	 * @var string
+	 */
+	public $useTable = 'aros';
 
 	/**
 	 * Belongs to.
 	 *
-	 * @access public
-	 * @var array 
+	 * @var array
 	 */
 	public $belongsTo = array(
-		'AccessLevel' => array(
-			'className' => 'Forum.AccessLevel'
-		), 
-		'User'
+		'Group' => array(
+			'className' => 'Forum.Access',
+			'foreignKey' => 'parent_id'
+		),
+		'User' => array(
+			'className' => FORUM_USER,
+			'foreignKey' => 'foreign_key',
+			'conditions' => array('Access.model' => 'User')
+		)
 	);
-	
+
+	/**
+	 * Behaviors.
+	 *
+	 * @var array
+	 */
+	public $actsAs = array(
+		'Containable',
+		'Tree' => array('type' => 'nested'),
+		'Utility.Cacheable' => array(
+			'cacheConfig' => 'forum',
+			'appendKey' => false
+		)
+	);
+
 	/**
 	 * Validation.
 	 *
-	 * @access public
 	 * @var array
 	 */
 	public $validate = array(
-		'user_id' => 'notEmpty',
-		'access_level_id' => 'notEmpty'
+		'foreign_key' => 'notEmpty',
+		'parent_id' => 'notEmpty'
 	);
-	
+
 	/**
 	 * Add a user once conditions are validated.
-	 * 
-	 * @access public
+	 *
 	 * @param array $data
 	 * @return mixed
 	 */
 	public function add($data) {
-		if ($user = $this->validate($data)) {
-			if ($this->grant($data['user_id'], $data['access_level_id'])) {
-				return $user;
+		$this->set($data);
+
+		if ($this->validates()) {
+			$exists = $this->User->find('count', array(
+				'conditions' => array('User.id' => $data['foreign_key'])
+			));
+
+			if ($exists <= 0) {
+				$this->invalidate('foreign_key', __d('forum', 'No user exists with this ID'));
+				return false;
 			}
+
+			$aro = $this->getByUserId($data['foreign_key']);
+
+			if (!empty($aro) && $aro['Access']['parent_id'] == $data['parent_id']) {
+				$this->invalidate('foreign_key', __d('forum', 'User already has this access'));
+				return false;
+			}
+
+			$user = ClassRegistry::init('Forum.Profile')->getUserProfile($data['foreign_key']);
+
+			$this->create();
+			$this->save(array(
+				'model' => 'User',
+				'alias' => $user['User'][Configure::read('Forum.userMap.username')],
+				'parent_id' => $data['parent_id'],
+				'foreign_key' => $data['foreign_key']
+			));
+
+			return $user;
 		}
-		
+
 		return false;
-	}
-	
-	/**
-	 * Grant access to a user, validating conditions.
-	 * 
-	 * @access public
-	 * @param int $user_id
-	 * @param int $level_id
-	 * @return type 
-	 */
-	public function grant($user_id, $level_id) {
-		$count = $this->find('count', array(
-			'conditions' => array(
-				'Access.user_id' => $user_id,
-				'Access.access_level_id' => $level_id
-			)
-		));
-		
-		if ($count) {
-			return $this->invalidate('user_id', 'User already has this access');
-		}
-		
-		$this->create();
-		$this->save(array(
-			'user_id' => $user_id,
-			'access_level_id' => $level_id
-		));
-		
-		return true;
 	}
 
 	/**
-	 * Return an access level and its user.
-	 * 
-	 * @access public
-	 * @param int $id
-	 * @return array 
+	 * Return all records.
+	 *
+	 * @return array
 	 */
-	public function get($id) {
-		return $this->find('first', array(
-			'conditions' => array('Access.id' => $id),
-			'contain' => array('User', 'AccessLevel')
+	public function getAll() {
+		return $this->find('all', array(
+			'conditions' => array('Access.parent_id' => null),
+			'cache' => __METHOD__
 		));
 	}
-	
+
 	/**
-	 * Get a list of all staff and their levels.
+	 * Return all records as a list.
 	 *
-	 * @access public
 	 * @return array
 	 */
 	public function getList() {
-		return $this->find('all', array(
-			'contain' => array('User' => array('Profile'), 'AccessLevel'),
-			'order' => array('Access.access_level_id' => 'ASC')
+		return $this->find('list', array(
+			'conditions' => array('Access.parent_id' => null),
+			'fields' => array('Access.id', 'Access.alias'),
+			'cache' => __METHOD__
 		));
 	}
-	
+
 	/**
-	 * Get a list of all levels for a user.
+	 * Return a record based on ID.
 	 *
-	 * @access public
+	 * @param int $id
+	 * @return array
+	 */
+	public function getById($id) {
+		return $this->find('first', array(
+			'conditions' => array('Access.id' => $id),
+			'contain' => array('Group', 'User'),
+			'cache' => array(__METHOD__, $id)
+		));
+	}
+
+	/**
+	 * Return a record based on user ID.
+	 *
 	 * @param int $user_id
 	 * @return array
 	 */
-	public function getListByUser($user_id) {
-		return $this->find('all', array(
-			'contain' => array('AccessLevel'),
-			'conditions' => array('Access.user_id' => $user_id)
+	public function getByUserId($user_id) {
+		return $this->find('first', array(
+			'conditions' => array(
+				'Access.foreign_key' => $user_id,
+				'Access.model' => 'User'
+			),
+			'contain' => array('Group', 'User'),
+			'cache' => array(__METHOD__, $user_id)
 		));
 	}
 
 	/**
-	 * Move all users to a new level.
-	 * 
-	 * @access public
-	 * @param int $start_id
-	 * @param int $moved_id
-	 * @return boolean
+	 * Return a record based on slug.
+	 *
+	 * @param string $slug
+	 * @return array
 	 */
-	public function moveAll($start_id, $moved_id) {
-		return $this->updateAll(
-			array('Access.access_level_id' => $moved_id),
-			array('Access.access_level_id' => $start_id)
-		);
+	public function getBySlug($slug) {
+		return $this->find('first', array(
+			'conditions' => array('Access.alias' => $slug),
+			'cache' => array(__METHOD__, $slug)
+		));
 	}
-	
+
 	/**
-	 * Validate logical conditions.
-	 * 
-	 * @access public
-	 * @param array $data
-	 * @return boolean
+	 * Return all the staff.
+	 *
+	 * @return array
 	 */
-	public function validate($data) {
-		$this->set($data);
-		
-		if ($this->validates()) {
-			$userCount = $this->User->find('count', array(
-				'conditions' => array('User.id' => $data['user_id'])
+	public function getStaff() {
+		return $this->find('all', array(
+			'conditions' => array(
+				'Access.parent_id' => array_keys($this->getList()),
+				'Access.foreign_key !=' => null,
+				'Access.model' => 'User'
+			),
+			'contain' => array('User' => array('ForumProfile'), 'Group')
+		));
+	}
+
+	/**
+	 * Return all the staff by slug.
+	 *
+	 * @param string $slug
+	 * @return array
+	 */
+	public function getStaffBySlug($slug) {
+		$access = $this->getBySlug($slug);
+
+		return $this->find('all', array(
+			'conditions' => array(
+				'Access.parent_id' => $access['Access']['id'],
+				'Access.foreign_key !=' => null,
+				'Access.model' => 'User'
+			),
+			'contain' => array('User' => array('ForumProfile'), 'Group'),
+			'cache' => array(__METHOD__, $slug)
+		));
+	}
+
+	/**
+	 * Return all the administrators.
+	 *
+	 * @return array
+	 */
+	public function getAdmins() {
+		return $this->getStaffBySlug(Configure::read('Forum.aroMap.admin'));
+	}
+
+	/**
+	 * Return all the super moderators.
+	 *
+	 * @return array
+	 */
+	public function getSuperMods() {
+		return $this->getStaffBySlug(Configure::read('Forum.aroMap.superMod'));
+	}
+
+	/**
+	 * Return a list of users permissions. Include parent groups permissions also.
+	 *
+	 * @param int $user_id
+	 * @return array
+	 */
+	public function getPermissions($user_id) {
+		try {
+			$aros = $this->node(array('User' => array('id' => $user_id)));
+		} catch (Exception $e) {
+			return null;
+		}
+
+		return ClassRegistry::init('Permission')->find('all', array(
+			'conditions' => array('Permission.aro_id' => Hash::extract($aros, '{n}.Access.id')),
+			'order' => array('Aco.lft' => 'desc'),
+			'recursive' => 0
+		));
+	}
+
+	/**
+	 * Return a list of users roles defined in the ACL.
+	 *
+	 * @param int $user_id
+	 * @return array
+	 */
+	public function getRoles($user_id) {
+		$results = $this->find('all', array(
+			'conditions' => array(
+				'Access.foreign_key' => $user_id,
+				'Access.model' => 'User'
+			)
+		));
+
+		if ($results) {
+			$results = $this->find('all', array(
+				'conditions' => array('Access.id' => Hash::extract($results, '{n}.Access.parent_id'))
+			));
+		}
+
+		return $results;
+	}
+
+	/**
+	 * Install all the required ACL requester and control objects for the forum.
+	 * Check for existence of specific aliases before hand.
+	 *
+	 * @return array
+	 */
+	public function installAcl() {
+		$Permission = ClassRegistry::init('Permission');
+		$Aco = ClassRegistry::init('Aco');
+		$Aro = ClassRegistry::init('Aro');
+
+		// Create ACL request objects
+		$aroMap = array();
+
+		foreach (Configure::read('Forum.aroMap') as $alias) {
+
+			// Check to see if the ARO already exists
+			$result = $Aro->find('first', array(
+				'conditions' => array('alias' => $alias),
+				'recursive' => -1
 			));
 
-			if ($userCount <= 0) {
-				return $this->invalidate('user_id', 'No user exists with this ID');
+			if ($result) {
+				$id = $result['Aro']['id'];
+
+			// Else create a new record
+			} else {
+				$Aro->create();
+				$Aro->save(array('alias' => $alias));
+
+				$id = $Aro->id;
 			}
 
-			return ClassRegistry::init('Profile')->getUserProfile($data['user_id']);
+			$aroMap[$id] = $alias;
 		}
-		
-		return false;
+
+		// Create ACL control objects
+		$acoMap = array();
+
+		foreach (array('stations', 'topics', 'posts', 'polls') as $alias) {
+			$alias = 'forum.' . $alias;
+
+			// Check to see if the ACO already exists
+			$result = $Aco->find('first', array(
+				'conditions' => array('alias' => $alias),
+				'recursive' => -1
+			));
+
+			if ($result) {
+				$id = $result['Aco']['id'];
+
+			// Else create a new record
+			} else {
+				$Aco->create();
+				$Aco->save(array('alias' => $alias));
+
+				$id = $Aco->id;
+			}
+
+			$acoMap[$id] = $alias;
+		}
+
+		// Allow ACOs to AROs
+		foreach ($aroMap as $ro) {
+			foreach ($acoMap as $co) {
+				$Permission->allow($ro, $co);
+			}
+		}
+
+		return array(
+			'aro' => $aroMap,
+			'aco' => $acoMap
+		);
 	}
-	
+
 }

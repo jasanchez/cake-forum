@@ -1,7 +1,6 @@
-<?php 
+<?php
 
-$this->Html->addCrumb($settings['site_name'], array('controller' => 'forum', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Search'), array('controller' => 'search', 'action' => 'index')); ?>
+$this->Breadcrumb->add(__d('forum', 'Search'), array('controller' => 'search', 'action' => 'index')); ?>
 
 <div class="title">
 	<h2><?php echo __d('forum', 'Search'); ?></h2>
@@ -14,16 +13,16 @@ $this->Html->addCrumb(__d('forum', 'Search'), array('controller' => 'search', 'a
 		<table style="width: 100%">
 			<tbody>
 				<tr>
-					<td class="align-right"><?php echo $this->Form->label('keywords', __d('forum', 'Keywords') .':'); ?></td>
+					<td class="align-right"><?php echo $this->Form->label('keywords', __d('forum', 'Keywords') . ':'); ?></td>
 					<td><?php echo $this->Form->input('keywords', array('div' => false, 'label' => false, 'style' => 'width: 300px')); ?></td>
 
-					<td class="align-right"><?php echo $this->Form->label('forum_id', __d('forum', 'Within Forum Category') .':'); ?></td>
-					<td><?php echo $this->Form->input('forum_id', array('div' => false, 'label' => false, 'options' => $forums, 'escape' => false, 'empty' => true)); ?></td>
+					<td class="align-right"><?php echo $this->Form->label('forum_id', __d('forum', 'Within Forum Category') . ':'); ?></td>
+					<td><?php echo $this->Form->input('forum_id', array('div' => false, 'label' => false, 'options' => $forums, 'empty' => true)); ?></td>
 
-					<td class="align-right"><?php echo $this->Form->label('orderBy', __d('forum', 'Order By') .':'); ?></td>
+					<td class="align-right"><?php echo $this->Form->label('orderBy', __d('forum', 'Order By') . ':'); ?></td>
 					<td><?php echo $this->Form->input('orderBy', array('div' => false, 'label' => false, 'options' => $orderBy)); ?></td>
 
-					<td class="align-right"><?php echo $this->Form->label('byUser', __d('forum', 'By User (Username)') .':'); ?></td>
+					<td class="align-right"><?php echo $this->Form->label('byUser', __d('forum', 'By User (Username)') . ':'); ?></td>
 					<td><?php echo $this->Form->input('byUser', array('div' => false, 'label' => false, 'style' => 'width: 150px')); ?></td>
 				</tr>
 			</tbody>
@@ -31,9 +30,9 @@ $this->Html->addCrumb(__d('forum', 'Search'), array('controller' => 'search', 'a
 	</div>
 </div>
 
-<?php 
+<?php
 echo $this->Form->submit(__d('forum', 'Search Topics'), array('class' => 'button'));
-echo $this->Form->end(); 
+echo $this->Form->end();
 
 if ($searching) { ?>
 
@@ -55,10 +54,10 @@ if ($searching) { ?>
 			</thead>
 			<tbody>
 
-			<?php if (empty($topics)) { ?>
+			<?php if (!$topics) { ?>
 
 				<tr>
-					<td colspan="8" class="empty"><?php echo __d('forum', 'No results were found, please refine your search criteria.'); ?></td>
+					<td colspan="8" class="empty"><?php echo __d('forum', 'No results were found, please refine your search criteria'); ?></td>
 				</tr>
 
 			<?php } else {
@@ -68,7 +67,7 @@ if ($searching) { ?>
 						'counter' => $counter,
 						'columns' => array('forum')
 					));
-				} 
+				}
 			} ?>
 
 			</tbody>

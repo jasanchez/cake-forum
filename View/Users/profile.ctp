@@ -1,54 +1,53 @@
-<?php 
+<?php
 
-$this->Html->addCrumb($settings['site_name'], array('controller' => 'forum', 'action' => 'index'));
-$this->Html->addCrumb(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index'));
-$this->Html->addCrumb($profile['User'][$config['userMap']['username']], $this->here); ?>
+$this->Breadcrumb->add(__d('forum', 'Users'), array('controller' => 'users', 'action' => 'index'));
+$this->Breadcrumb->add($profile['User'][$config['userMap']['username']], $this->Forum->profileUrl($profile['User'])); ?>
 
 <div class="title">
 	<?php echo $this->Html->link(__d('forum', 'Report User'), array('action' => 'report', $profile['User']['id']), array('class' => 'button float-right')); ?>
-	<h2><?php echo $profile['User'][$config['userMap']['username']]; ?></h2>
+	<h2><?php echo h($profile['User'][$config['userMap']['username']]); ?></h2>
 </div>
 
-<?php if (!empty($profile['Profile']['signatureHtml'])) { ?>
-	<p><?php echo $profile['Profile']['signatureHtml']; ?></p>
-<?php } ?>
+<?php if (!empty($profile['Profile']['signature'])) {
+	echo $this->Decoda->parse($profile['Profile']['signature']);
+} ?>
 
 <div class="container">
 	<table class="table">
 		<tbody>
 			<tr>
-				<?php if ($settings['enable_gravatar']) { ?>
+				<?php if ($avatar = $this->Forum->avatar($profile)) { ?>
 					<td rowspan="2" style="width: 80px;">
-						<?php echo $this->Gravatar->image($profile['User'][$config['userMap']['email']]); ?>
+						<?php echo $avatar; ?>
 					</td>
 				<?php } ?>
 
 				<td><strong><?php echo __d('forum', 'Joined'); ?>:</strong></td>
-				<td><?php echo $this->Time->nice($profile['Profile']['created'], $this->Common->timezone()); ?></td>
+				<td><?php echo $this->Time->nice($profile['Profile']['created'], $this->Forum->timezone()); ?></td>
 
 				<td><strong><?php echo __d('forum', 'Total Topics'); ?>:</strong></td>
 				<td><?php echo number_format($profile['Profile']['totalTopics']); ?></td>
-				
+
 				<td><strong><?php echo __d('forum', 'Roles'); ?>:</strong></td>
 				<td>
-					<?php if (!empty($profile['User']['Access'])) { 
-						$roles = array();
-						foreach ($profile['User']['Access'] as $access) {
-							$roles[] = $access['AccessLevel']['title'];
+					<?php if (!empty($roles)) {
+						$rls = array();
+						foreach ($roles as $role) {
+							$rls[] = $this->Forum->options('accessGroups', $role['Access']['id']);
 						}
-						echo implode(', ', $roles);
+						echo implode(', ', $rls);
 					} else {
-						echo '<em>'. __d('forum', 'N/A') .'</em>';
+						echo '<em>' . __d('forum', 'N/A') . '</em>';
 					} ?>
 				</td>
 			</tr>
 			<tr>
 				<td><strong><?php echo __d('forum', 'Last Login'); ?>:</strong></td>
 				<td>
-					<?php if (!empty($profile['Profile']['lastLogin'])) {
-						echo $this->Time->timeAgoInWords($profile['Profile']['lastLogin'], array('userOffset' => $this->Common->timezone()));
+					<?php if ($profile['Profile']['lastLogin']) {
+						echo $this->Time->timeAgoInWords($profile['Profile']['lastLogin'], array('userOffset' => $this->Forum->timezone()));
 					} else {
-						echo '<em>'. __d('forum', 'Never') .'</em>';
+						echo '<em>' . __d('forum', 'Never') . '</em>';
 					} ?>
 				</td>
 
@@ -57,28 +56,28 @@ $this->Html->addCrumb($profile['User'][$config['userMap']['username']], $this->h
 
 				<td><strong><?php echo __d('forum', 'Moderates'); ?>:</strong></td>
 				<td>
-					<?php if (!empty($profile['User']['Moderator'])) { 
+					<?php if (!empty($profile['User']['ForumModerator'])) {
 						$mods = array();
-						foreach ($profile['User']['Moderator'] as $mod) {
+						foreach ($profile['User']['ForumModerator'] as $mod) {
 							$mods[] = $this->Html->link($mod['Forum']['title'], array('controller' => 'stations', 'action' => 'view', $mod['Forum']['slug']));
 						}
 						echo implode(', ', $mods);
 					} else {
-						echo '<em>'. __d('forum', 'N/A') .'</em>';
+						echo '<em>' . __d('forum', 'N/A') . '</em>';
 					} ?>
 				</td>
 			</tr>
 		</tbody>
 	</table>
 </div>
-	
-<?php if (!empty($topics)) { ?>
-	
+
+<?php if ($topics) { ?>
+
 <div class="container">
 	<div class="containerHeader">
 		<h3><?php echo __d('forum', 'Latest Topics'); ?></h3>
 	</div>
-	
+
 	<div class="containerContent">
 		<table class="table">
 			<thead>
@@ -96,10 +95,10 @@ $this->Html->addCrumb($profile['User'][$config['userMap']['username']], $this->h
 
 				<tr<?php if ($counter % 2) echo ' class="altRow"'; ?>>
 					<td><?php echo $this->Html->link($topic['Topic']['title'], array('controller' => 'topics', 'action' => 'view', $topic['Topic']['slug'])); ?></td>
-					<td class="created"><?php echo $this->Time->niceShort($topic['Topic']['created'], $this->Common->timezone()); ?></td>
+					<td class="created"><?php echo $this->Time->niceShort($topic['Topic']['created'], $this->Forum->timezone()); ?></td>
 					<td class="stat"><?php echo number_format($topic['Topic']['post_count']); ?></td>
 					<td class="stat"><?php echo number_format($topic['Topic']['view_count']); ?></td>
-					<td class="activity"><?php echo $this->Time->timeAgoInWords($topic['LastPost']['created'], array('userOffset' => $this->Common->timezone())); ?></td>
+					<td class="activity"><?php echo $this->Time->timeAgoInWords($topic['LastPost']['created'], array('userOffset' => $this->Forum->timezone())); ?></td>
 				</tr>
 
 			<?php } ?>
@@ -107,17 +106,17 @@ $this->Html->addCrumb($profile['User'][$config['userMap']['username']], $this->h
 			</tbody>
 		</table>
 	</div>
-</div>   
-	
+</div>
+
 <?php }
 
-if (!empty($posts)) { ?>
-	
+if ($posts) { ?>
+
 <div class="container">
 	<div class="containerHeader">
 		<h3><?php echo __d('forum', 'Latest Posts'); ?></h3>
 	</div>
-	
+
 	<div class="containerContent">
 		<table class="table">
 			<thead>
@@ -128,23 +127,23 @@ if (!empty($posts)) { ?>
 				</tr>
 			</thead>
 			<tbody>
-				
+
 			<?php foreach($posts as $post) { ?>
 
 				<tr class="altRow">
 					<td><strong><?php echo $this->Html->link($post['Topic']['title'], array('controller' => 'topics', 'action' => 'view', $post['Topic']['slug'])); ?></strong></td>
-					<td><?php echo $this->Html->link($post['Topic']['User'][$config['userMap']['username']], array('controller' => 'users', 'action' => 'profile', $post['Topic']['User']['id'])); ?></td>
-					<td class="ar"><?php echo $this->Time->timeAgoInWords($post['Post']['created'], array('userOffset' => $this->Common->timezone())); ?></td>
+					<td><?php echo $this->Html->link($post['Topic']['User'][$config['userMap']['username']], $this->Forum->profileUrl($post['Topic']['User'])); ?></td>
+					<td class="ar"><?php echo $this->Time->timeAgoInWords($post['Post']['created'], array('userOffset' => $this->Forum->timezone())); ?></td>
 				</tr>
 				<tr>
-					<td colspan="3"><?php echo $post['Post']['contentHtml']; ?></td>
+					<td colspan="3"><?php echo $this->Decoda->parse($post['Post']['content']); ?></td>
 				</tr>
 
 			<?php } ?>
 
 			</tbody>
 		</table>
-	</div>    
+	</div>
 </div>
-	
+
 <?php } ?>

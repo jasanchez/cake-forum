@@ -1,31 +1,28 @@
 <?php
-/** 
- * Forum - Profile
- *
- * @author      Miles Johnson - http://milesj.me
- * @copyright   Copyright 2006-2011, Miles Johnson, Inc.
- * @license     http://opensource.org/licenses/mit-license.php - Licensed under The MIT License
- * @link        http://milesj.me/code/cakephp/forum
+/**
+ * @copyright	Copyright 2006-2013, Miles Johnson - http://milesj.me
+ * @license		http://opensource.org/licenses/mit-license.php - Licensed under the MIT License
+ * @link		http://milesj.me/code/cakephp/forum
  */
 
-App::import('Vendor', 'Forum.Decoda', array(
-	'file' => 'decoda/Decoda.php'
-));
+App::uses('ForumAppModel', 'Forum.Model');
 
 class Profile extends ForumAppModel {
 
 	/**
 	 * Belongs to.
 	 *
-	 * @access public
 	 * @var array
 	 */
-	public $belongsTo = array('User');
-		
+	public $belongsTo = array(
+		'User' => array(
+			'className' => FORUM_USER
+		)
+	);
+
 	/**
 	 * Validate.
 	 *
-	 * @access public
 	 * @var array
 	 */
 	public $validate = array(
@@ -54,40 +51,34 @@ class Profile extends ForumAppModel {
 	/**
 	 * Grab a profile based on ID.
 	 *
-	 * @access public
 	 * @param int $id
 	 * @return array
 	 */
-	public function get($id) {
+	public function getById($id) {
 		return $this->find('first', array(
 			'conditions' => array('Profile.id' => $id),
-			'contain' => array('User')
+			'contain' => array('User'),
+			'cache' => array(__METHOD__, $id)
 		));
 	}
-		
+
 	/**
 	 * Get a users profile and all relevant information.
-	 * 
-	 * @access public
+	 *
 	 * @param int $user_id
 	 * @return array
 	 */
 	public function getByUser($user_id) {
-		return $this->find('first', array(
-			'conditions' => array('Profile.user_id' => $user_id),
-			'contain' => array(
-				'User' => array(
-					'Moderator' => array('Forum.id', 'Forum.slug', 'Forum.title'),
-					'Access' => array('AccessLevel')
-				)
-			)
-		));
+		return $this->getUserProfile($user_id, array(
+			'User' => array(
+				'ForumModerator' => array('Forum.id', 'Forum.slug', 'Forum.title')
+			))
+		);
 	}
-	
+
 	/**
 	 * Return the latest user profiles.
-	 * 
-	 * @access profile
+	 *
 	 * @param int $limit
 	 * @return int
 	 */
@@ -95,125 +86,117 @@ class Profile extends ForumAppModel {
 		return $this->find('all', array(
 			'order' => array('Profile.created' => 'DESC'),
 			'contain' => array('User'),
-			'limit' => $limit
+			'limit' => $limit,
+			'cache' => array(__METHOD__, $limit)
 		));
 	}
 
 	/**
 	 * Get the newest signup.
 	 *
-	 * @access public
 	 * @return array
 	 */
 	public function getNewestUser() {
 		return $this->find('first', array(
 			'order' => array('Profile.created' => 'DESC'),
 			'contain' => array('User'),
-			'limit' => 1
+			'limit' => 1,
+			'cache' => __METHOD__
 		));
 	}
 
 	/**
 	 * Grab the users profile. If it doesn't exist, create it!
 	 *
-	 * @access public
 	 * @param int $user_id
+	 * @param array $contain
 	 * @return array
 	 */
-	public function getUserProfile($user_id) {
+	public function getUserProfile($user_id, array $contain = array('User')) {
 		$profile = $this->find('first', array(
 			'conditions' => array('Profile.user_id' => $user_id),
-			'contain' => array('User')
+			'contain' => $contain
 		));
 
-		if (empty($profile) && $user_id) {
+		if (!$profile && $user_id) {
 			$this->create();
 			$this->save(array('user_id' => $user_id), false);
 
 			return $this->find('first', array(
 				'conditions' => array('Profile.id' => $this->id),
-				'contain' => array('User')
+				'contain' => $contain
 			));
 		}
-		
+
 		return $profile;
 	}
 
 	/**
 	 * Increase the post count.
 	 *
-	 * @access public
 	 * @param int $user_id
-	 * @return boolean
+	 * @return bool
 	 */
 	public function increasePosts($user_id) {
-		return $this->query('UPDATE `'. $this->tablePrefix .'profiles` AS `Profile` SET `Profile`.`totalPosts` = `Profile`.`totalPosts` + 1 WHERE `Profile`.`user_id` = '. (int) $user_id);
+		return $this->query('UPDATE `' . $this->tablePrefix . 'profiles` AS `Profile` SET `Profile`.`totalPosts` = `Profile`.`totalPosts` + 1 WHERE `Profile`.`user_id` = ' . (int) $user_id);
 	}
 
 	/**
 	 * Increase the topic count.
 	 *
-	 * @access public
 	 * @param int $user_id
-	 * @return boolean
+	 * @return bool
 	 */
 	public function increaseTopics($user_id) {
-		return $this->query('UPDATE `'. $this->tablePrefix .'profiles` AS `Profile` SET `Profile`.`totalTopics` = `Profile`.`totalTopics` + 1 WHERE `Profile`.`user_id` = '. (int) $user_id);
+		return $this->query('UPDATE `' . $this->tablePrefix . 'profiles` AS `Profile` SET `Profile`.`totalTopics` = `Profile`.`totalTopics` + 1 WHERE `Profile`.`user_id` = ' . (int) $user_id);
 	}
-	
+
 	/**
 	 * Login the user and update records.
 	 *
-	 * @access public
 	 * @param int $user_id
-	 * @return boolean
+	 * @return bool
 	 */
 	public function login($user_id) {
 		if ($profile = $this->getUserProfile($user_id)) {
 			$this->id = $profile['Profile']['id'];
-			
+
 			return $this->save(array(
 				'currentLogin' => date('Y-m-d H:i:s'),
 				'lastLogin' => $profile['Profile']['currentLogin']
 			), false);
 		}
+
+		return false;
 	}
 
 	/**
 	 * Get whos online within the past x minutes.
 	 *
-	 * @access public
 	 * @param int $minutes
 	 * @return array
 	 */
 	public function whosOnline($minutes = null) {
 		if (!$minutes) {
-			$minutes = $this->settings['whos_online_interval'];
+			$minutes = Configure::read('Forum.settings.whosOnlineInterval');
 		}
 
 		return $this->find('all', array(
-			'conditions' => array('Profile.currentLogin >' => date('Y-m-d H:i:s', strtotime('-'. $minutes .' minutes'))),
+			'conditions' => array('Profile.currentLogin >' => date('Y-m-d H:i:s', strtotime($minutes))),
 			'contain' => array('User'),
-			'cache' => array(__FUNCTION__ .'-'. $minutes, '+15 minutes')
+			'cache' => array(__METHOD__, $minutes),
+			'cacheExpires' => '+15 minutes'
 		));
 	}
 
 	/**
 	 * Parse the HTML version.
+	 *
+	 * @param array $options
+	 * @return bool
 	 */
-	public function beforeSave($options) {
-		if (isset($this->data['Profile']['signature'])) {
-			$censored = array_map('trim', explode(',', $this->settings['censored_words']));
-			$locale = $this->config['decodaLocales'][Configure::read('Config.language')];
-			
-			$decoda = new Decoda($this->data['Profile']['signature']);
-			$decoda->defaults()->setXhtml()->setLocale($locale);
-			$decoda->getHook('Censor')->blacklist($censored);
-			
-			$this->data['Profile']['signatureHtml'] = $decoda->parse();
-		}
-		
-		return true;
+	public function beforeSave($options = array()) {
+		return $this->validateDecoda('Profile', 'signature');
 	}
 
 }
